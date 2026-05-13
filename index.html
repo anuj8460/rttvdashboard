@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FarEye | Dashboard Module</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div id="app-container">
+        <!-- Embedded Top Navigation Bar (No Logo/Avatar) -->
+        <header id="top-bar" style="padding: 0 16px;">
+            <nav id="main-nav">
+                <a class="nav-item active" data-view="reefer">Reefer Runtime</a>
+                <a class="nav-item" data-view="maintenance">Preventive Maint.</a>
+                <a class="nav-item" data-view="fuel">Fuel Intelligence</a>
+                <a class="nav-item" data-view="compliance">Compliance</a>
+                <a class="nav-item" data-view="iot">IoT Device Health</a>
+            </nav>
+            <div class="top-bar-actions">
+                <div class="live-indicator">
+                    <span class="live-indicator-dot"></span>
+                    LIVE
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <div class="main-workspace">
+            <!-- Filter Bar -->
+            <div id="filter-bar">
+                <div class="filter-group">
+                    <label>Date Range</label>
+                    <select id="filter-date">
+                        <option>Today</option>
+                        <option>Last 7 Days</option>
+                        <option selected>Last 30 Days</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Region</label>
+                    <select id="filter-region">
+                        <option value="all">All Regions</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Fleet Type</label>
+                    <select id="filter-type">
+                        <option value="all">All Types</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Status</label>
+                    <select id="filter-status">
+                        <option value="all">All Status</option>
+                        <option value="Healthy">Healthy</option>
+                        <option value="Warning">Warning</option>
+                        <option value="Critical">Critical</option>
+                    </select>
+                </div>
+                <button id="reset-filters">RESET FILTERS</button>
+            </div>
+
+            <main id="content">
+                <div class="dashboard-scroll-area">
+                    
+                    <!-- Reefer View -->
+                    <div id="view-reefer" class="view-container active">
+                        <div class="kpi-ribbon" id="reefer-kpi-ribbon"></div>
+                        <div class="widget-grid">
+                            <div class="widget" style="grid-column: span 6;">
+                                <div class="widget-header"><div class="widget-title">Fleet Runtime Risk Bands (Click to filter table)</div></div>
+                                <div class="risk-band-container" id="runtime-risk-bands"></div>
+                            </div>
+                            <div class="widget" style="grid-column: span 6;">
+                                <div class="widget-header"><div class="widget-title">Average Runtime by Region</div></div>
+                                <canvas id="reeferRegionChart" height="200"></canvas>
+                            </div>
+                            <div class="widget" style="grid-column: span 12;">
+                                <div class="widget-header">
+                                    <div class="widget-title" id="table-title">Truck Investigation Ledger</div>
+                                    <button id="clear-table-filter" style="display:none; font-size:12px; padding:4px 8px; background:var(--bg-main); border:1px solid var(--border); border-radius:4px; cursor:pointer;">Clear Filter</button>
+                                </div>
+                                <div class="table-container">
+                                    <table id="reefer-table">
+                                        <thead><tr><th>Truck #</th><th>Region</th><th>Type</th><th>Runtime</th><th>Avg/Day</th><th>Next Maint.</th><th>Status</th></tr></thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Maintenance View -->
+                    <div id="view-maintenance" class="view-container">
+                        <div class="kpi-ribbon" id="maintenance-kpi-ribbon"></div>
+                        <div class="widget-grid">
+                            <div class="widget" style="grid-column: span 6;">
+                                <div class="widget-header"><div class="widget-title">Upcoming Maintenance Schedule</div></div>
+                                <div class="table-container" style="max-height: 250px;">
+                                    <table id="maintenance-schedule-table">
+                                        <thead><tr><th>Truck #</th><th>Region</th><th>Due Date</th><th>Status</th></tr></thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="widget" style="grid-column: span 6;">
+                                <div class="widget-header"><div class="widget-title">Service Status Breakdown</div></div>
+                                <canvas id="maintenanceStatusChart" height="200"></canvas>
+                            </div>
+                            <div class="widget" style="grid-column: span 12;">
+                                <div class="widget-header"><div class="widget-title">Asset Health Matrix (Region-wise)</div></div>
+                                <div id="maintenance-heatmap" class="heatmap-grid"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Fuel View -->
+                    <div id="view-fuel" class="view-container">
+                        <div class="kpi-ribbon" id="fuel-kpi-ribbon"></div>
+                        <div class="widget-grid">
+                            <div class="widget" style="grid-column: span 6;">
+                                <div class="widget-header"><div class="widget-title">Fuel Efficiency vs Idle Time</div></div>
+                                <canvas id="fuelScatterChart" height="250"></canvas>
+                            </div>
+                            <div class="widget" style="grid-column: span 6;">
+                                <div class="widget-header"><div class="widget-title">Average Fuel Efficiency by Fleet Type</div></div>
+                                <canvas id="fuelTypeChart" height="250"></canvas>
+                            </div>
+                            <div class="widget" style="grid-column: span 12;">
+                                <div class="widget-header"><div class="widget-title">Fuel Theft & Anomaly Alerts</div></div>
+                                <div id="fuel-theft-alerts" class="alert-list" style="max-height: 200px;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Compliance View -->
+                    <div id="view-compliance" class="view-container">
+                        <div class="kpi-ribbon" id="compliance-kpi-ribbon"></div>
+                        <div class="widget-grid">
+                            <div class="widget" style="grid-column: span 6;">
+                                <div class="widget-header"><div class="widget-title">Document Expiry Overview</div></div>
+                                <canvas id="complianceDoughnutChart" height="250"></canvas>
+                            </div>
+                            <div class="widget" style="grid-column: span 6;">
+                                <div class="widget-header"><div class="widget-title">Compliance Expiry Details</div></div>
+                                <div class="table-container" style="max-height: 250px;">
+                                    <table id="compliance-table">
+                                        <thead><tr><th>Truck #</th><th>Insurance</th><th>Registration</th><th>Permit</th></tr></thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- IoT View -->
+                    <div id="view-iot" class="view-container">
+                        <div class="kpi-ribbon" id="iot-kpi-ribbon"></div>
+                        <div class="widget-grid">
+                            <div class="widget" style="grid-column: span 6;">
+                                <div class="widget-header"><div class="widget-title">Sensor Active Status</div></div>
+                                <canvas id="iotBarChart" height="200"></canvas>
+                            </div>
+                            <div class="widget" style="grid-column: span 6;">
+                                <div class="widget-header"><div class="widget-title">Connectivity Quality (Ping Latency)</div></div>
+                                <canvas id="iotLineChart" height="200"></canvas>
+                            </div>
+                            <div class="widget" style="grid-column: span 12;">
+                                <div class="widget-header"><div class="widget-title">Device Inventory & Action</div></div>
+                                <div class="table-container">
+                                    <table id="iot-table">
+                                        <thead><tr><th>Truck #</th><th>GPS</th><th>Fuel</th><th>Temp</th><th>Camera</th><th>Action</th></tr></thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Alert Feed Panel -->
+                <div id="alert-feed-panel">
+                    <div class="alert-header">LIVE FEED</div>
+                    <div class="alert-list" id="global-alert-list"></div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Investigation Drawer -->
+    <div id="investigation-drawer">
+        <div class="drawer-header">
+            <h2 id="drawer-truck-id" style="font-size: 18px;">Select an Asset</h2>
+            <button id="close-drawer"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="drawer-content" id="drawer-content"></div>
+    </div>
+
+    <!-- Modals -->
+    <div class="modal-overlay" id="modal-overlay">
+        <div class="modal-card" id="iot-restart-modal">
+            <h3 style="margin-bottom: 16px;">Confirm Restart</h3>
+            <div id="restart-details" style="font-size: 13px; line-height: 1.6; margin-bottom: 20px; color: #475569;"></div>
+            <div style="display: flex; gap: 12px;">
+                <button id="cancel-restart" class="btn-secondary">CANCEL</button>
+                <button id="confirm-restart" class="btn-primary">CONFIRM RESTART</button>
+            </div>
+        </div>
+        <div class="modal-card" id="iot-progress-modal" style="display: none;">
+            <h3 style="margin-bottom: 8px;">Re-establishing Connectivity...</h3>
+            <div style="font-size: 12px; color: #8c8c8c; margin-bottom: 20px;">Estimated recovery time: <span id="restart-timer">05:00</span></div>
+            <div style="height: 8px; background: #f0f2f5; border-radius: 4px; overflow: hidden; margin-bottom: 12px;">
+                <div id="restart-progress-bar" style="height: 100%; background: #ef533f; width: 0%; transition: width 1s linear;"></div>
+            </div>
+            <div id="restart-step" style="font-size: 11px; font-weight: 500; color: #262626;">Initializing...</div>
+        </div>
+    </div>
+
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,513 @@
+document.addEventListener('DOMContentLoaded', () => {
+    // --- STATE MANAGEMENT ---
+    let currentFilters = {
+        region: 'all',
+        type: 'all',
+        status: 'all',
+        dateRange: '30'
+    };
+    let filteredData = [...FLEET_MASTER_DATA.trucks];
+    let charts = {};
+    let tableFilters = {
+        runtimeRange: null // e.g. [0, 1000]
+    };
+
+    // --- NAVIGATION & UI HELPERS ---
+    const navItems = document.querySelectorAll('.nav-item[data-view]');
+    const views = document.querySelectorAll('.view-container');
+
+    navItems.forEach(item => {
+        item.addEventListener('click', () => {
+            navItems.forEach(n => n.classList.remove('active'));
+            item.classList.add('active');
+            const target = item.getAttribute('data-view');
+            views.forEach(v => {
+                v.classList.remove('active');
+                if(v.id === `view-${target}`) v.classList.add('active');
+            });
+            tableFilters.runtimeRange = null; // Reset table filters on view change
+            renderActiveView(target);
+        });
+    });
+
+    // --- GLOBAL FILTERS ---
+    function initFilters() {
+        const regionSelect = document.getElementById('filter-region');
+        FLEET_MASTER_DATA.regions.forEach(r => {
+            const opt = document.createElement('option');
+            opt.value = r; opt.textContent = r;
+            regionSelect.appendChild(opt);
+        });
+
+        const typeSelect = document.getElementById('filter-type');
+        const types = [...new Set(FLEET_MASTER_DATA.trucks.map(t => t.type))];
+        types.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t; opt.textContent = t;
+            typeSelect.appendChild(opt);
+        });
+
+        const filterInputs = ['filter-region', 'filter-type', 'filter-status'];
+        filterInputs.forEach(id => {
+            document.getElementById(id).addEventListener('change', (e) => {
+                const key = id.split('-')[1];
+                currentFilters[key] = e.target.value;
+                applyFilters();
+            });
+        });
+
+        document.getElementById('reset-filters').addEventListener('click', () => {
+            currentFilters = { region: 'all', type: 'all', status: 'all', dateRange: '30' };
+            filterInputs.forEach(id => document.getElementById(id).value = 'all');
+            tableFilters.runtimeRange = null;
+            applyFilters();
+        });
+    }
+
+    function applyFilters() {
+        filteredData = FLEET_MASTER_DATA.trucks.filter(t => {
+            const regionMatch = currentFilters.region === 'all' || t.region === currentFilters.region;
+            const typeMatch = currentFilters.type === 'all' || t.type === currentFilters.type;
+            const statusMatch = currentFilters.status === 'all' || t.maintStatus === currentFilters.status;
+            return regionMatch && typeMatch && statusMatch;
+        });
+        const activeView = document.querySelector('.nav-item.active').getAttribute('data-view');
+        renderActiveView(activeView);
+    }
+
+    // --- KPI & RENDER HELPERS ---
+    function populateKPIRibbon(containerId, kpis) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = '';
+        kpis.forEach(k => {
+            const card = document.createElement('div');
+            card.className = 'kpi-card';
+            card.innerHTML = `
+                <div class="kpi-label">${k.label}</div>
+                <div class="kpi-value">${k.value}</div>
+                <div class="kpi-status" style="color: ${k.statusColor || '#64748b'}">${k.status || ''}</div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    // --- REEFER RUNTIME VIEW ---
+    function renderReeferView() {
+        const total = filteredData.length;
+        if(total === 0) return;
+
+        const downCount = filteredData.filter(t => t.maintStatus === 'Critical').length;
+        const avgRuntime = Math.round(filteredData.reduce((acc, t) => acc + t.runtime, 0) / total);
+        
+        populateKPIRibbon('reefer-kpi-ribbon', [
+            { label: 'Total Fleet', value: total, status: `Active: ${total - downCount} | Down: ${downCount}`, statusColor: downCount > 0 ? '#ef4444' : '#10b981' },
+            { label: 'Avg Runtime', value: `${avgRuntime}h`, status: 'Current Avg: 8.2h/day' },
+            { label: 'Fleet Risk', value: `${downCount}`, status: 'Trucks at Risk', statusColor: '#ef4444' },
+            { label: 'Maint. Compliance', value: '92.4%', status: 'Target: 95%' }
+        ]);
+
+        // Make the "Down" status clickable via the KPI ribbon wrapper
+        const downKpiCard = document.querySelectorAll('#reefer-kpi-ribbon .kpi-card')[0];
+        if (downKpiCard) {
+            downKpiCard.style.cursor = 'pointer';
+            downKpiCard.title = "Click to filter 'Down' trucks";
+            downKpiCard.onclick = () => {
+                tableFilters.status = 'Critical';
+                document.getElementById('clear-table-filter').style.display = 'block';
+                document.getElementById('table-title').textContent = `Truck Investigation Ledger (Filtered: Down Trucks)`;
+                renderReeferTable();
+            };
+        }
+
+        // Risk Bands (Interactive) mapped to maintStatus
+        const riskContainer = document.getElementById('runtime-risk-bands');
+        riskContainer.innerHTML = '';
+        
+        const bands = [
+            { id: 'Healthy', label: 'Healthy (Optimal)', color: '#10b981' },
+            { id: 'Monitor', label: 'Monitor (Moderate Use)', color: '#3b82f6' },
+            { id: 'Warning', label: 'Warning (High Use)', color: '#f59e0b' },
+            { id: 'Critical', label: 'Critical (Down/Overdue)', color: '#ef4444' }
+        ];
+
+        bands.forEach(b => {
+            const count = filteredData.filter(t => t.maintStatus === b.id).length;
+            const pct = (count / total) * 100 || 0;
+            const row = document.createElement('div');
+            row.className = 'risk-band';
+            row.style.cursor = 'pointer';
+            row.innerHTML = `
+                <div class="risk-label" style="width: 150px;">${b.label}</div>
+                <div class="risk-bar-bg"><div class="risk-bar-fill" style="width: ${pct}%; background: ${b.color};"></div></div>
+                <div class="risk-count">${count} Trucks</div>
+                <div class="risk-percent">${pct.toFixed(1)}%</div>
+            `;
+            row.onclick = () => {
+                tableFilters.status = b.id;
+                document.getElementById('clear-table-filter').style.display = 'block';
+                document.getElementById('table-title').textContent = `Truck Investigation Ledger (Filtered: ${b.label})`;
+                renderReeferTable();
+            };
+            riskContainer.appendChild(row);
+        });
+
+        document.getElementById('clear-table-filter').onclick = () => {
+            tableFilters.status = null;
+            document.getElementById('clear-table-filter').style.display = 'none';
+            document.getElementById('table-title').textContent = 'Truck Investigation Ledger';
+            renderReeferTable();
+        };
+
+        // Average Runtime by Region Chart
+        const regionData = {};
+        filteredData.forEach(t => {
+            if(!regionData[t.region]) regionData[t.region] = { sum: 0, count: 0 };
+            regionData[t.region].sum += t.runtime;
+            regionData[t.region].count += 1;
+        });
+        const labels = Object.keys(regionData);
+        const data = labels.map(l => regionData[l].sum / regionData[l].count);
+
+        if(charts.reeferRegion) charts.reeferRegion.destroy();
+        charts.reeferRegion = new Chart(document.getElementById('reeferRegionChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{ label: 'Avg Runtime (h)', data: data, backgroundColor: '#3b82f6', borderRadius: 4 }]
+            },
+            options: { scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
+        });
+
+        renderReeferTable();
+    }
+
+    function renderReeferTable() {
+        const tbody = document.querySelector('#reefer-table tbody');
+        tbody.innerHTML = '';
+        let displayData = filteredData;
+        if(tableFilters.status) {
+            displayData = filteredData.filter(t => t.maintStatus === tableFilters.status);
+        }
+        
+        displayData.forEach(t => {
+            const tr = document.createElement('tr');
+            tr.className = 'clickable';
+            tr.innerHTML = `
+                <td><strong>${t.id}</strong></td>
+                <td>${t.region}</td>
+                <td>${t.type}</td>
+                <td>${t.runtime}h</td>
+                <td>${t.avgRuntimeDay}h</td>
+                <td>${t.nextMaint}</td>
+                <td><span class="chip chip-${t.maintStatus.toLowerCase()}">${t.maintStatus}</span></td>
+            `;
+            tr.onclick = () => openInvestigation(t);
+            tbody.appendChild(tr);
+        });
+    }
+
+    // --- MAINTENANCE VIEW ---
+    function renderMaintenanceView() {
+        // Calculate upcoming maintenance
+        const now = new Date('2026-05-14');
+        const upcoming = filteredData.filter(t => {
+            const d = new Date(t.nextMaint);
+            const diffDays = (d - now) / (1000 * 60 * 60 * 24);
+            return diffDays >= 0 && diffDays <= 15;
+        });
+        const overdue = filteredData.filter(t => new Date(t.nextMaint) < now);
+
+        populateKPIRibbon('maintenance-kpi-ribbon', [
+            { label: 'Upcoming (15d)', value: `${upcoming.length}`, status: `Overdue: ${overdue.length}`, statusColor: overdue.length > 0 ? '#ef4444' : '#10b981' },
+            { label: 'Under Maintenance', value: `${filteredData.filter(t => t.maintStatus === 'Critical').length}`, status: 'Action Required', statusColor: '#ef4444' },
+            { label: 'Compliance', value: '94.2%', status: 'Target: 95%' }
+        ]);
+
+        // Upcoming Maintenance Table
+        const tbody = document.querySelector('#maintenance-schedule-table tbody');
+        tbody.innerHTML = '';
+        const sortedSchedule = [...filteredData].sort((a, b) => new Date(a.nextMaint) - new Date(b.nextMaint)).slice(0, 8);
+        sortedSchedule.forEach(t => {
+            const d = new Date(t.nextMaint);
+            const diffDays = Math.ceil((d - now) / (1000 * 60 * 60 * 24));
+            let statusText = diffDays < 0 ? 'Overdue' : (diffDays <= 7 ? 'Due Soon' : 'Scheduled');
+            let statusColor = diffDays < 0 ? 'red' : (diffDays <= 7 ? 'amber' : 'green');
+
+            tbody.innerHTML += `
+                <tr>
+                    <td><strong>${t.id}</strong></td>
+                    <td>${t.region}</td>
+                    <td>${t.nextMaint}</td>
+                    <td><span class="chip chip-${statusColor}">${statusText}</span></td>
+                </tr>
+            `;
+        });
+
+        // Service Status Chart based on actual data
+        const counts = { 'Healthy': 0, 'Monitor': 0, 'Warning': 0, 'Critical': 0 };
+        filteredData.forEach(t => counts[t.maintStatus]++);
+
+        if(charts.maintenanceStatus) charts.maintenanceStatus.destroy();
+        charts.maintenanceStatus = new Chart(document.getElementById('maintenanceStatusChart').getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: ['Healthy', 'Monitor', 'Warning', 'Critical'],
+                datasets: [{ data: [counts.Healthy, counts.Monitor, counts.Warning, counts.Critical], backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'], borderWidth: 0 }]
+            },
+            options: { cutout: '70%', plugins: { legend: { position: 'right' } } }
+        });
+
+        const heatmap = document.getElementById('maintenance-heatmap');
+        heatmap.style.gridTemplateColumns = `120px repeat(${FLEET_MASTER_DATA.regions.length}, 1fr)`;
+        heatmap.innerHTML = `<div></div>${FLEET_MASTER_DATA.regions.map(r => `<div style="font-size: 10px; font-weight: 700; text-align: center;">${r}</div>`).join('')}`;
+        
+        ['Engine', 'Transmission', 'Reefer Unit', 'Tires'].forEach(asset => {
+            heatmap.innerHTML += `<div style="font-size: 11px; font-weight: 600; padding: 4px 0;">${asset}</div>`;
+            FLEET_MASTER_DATA.regions.forEach(r => {
+                const score = Math.floor(Math.random() * 3);
+                const cls = score === 0 ? 'cell-green' : (score === 1 ? 'cell-amber' : 'cell-red');
+                heatmap.innerHTML += `<div class="heatmap-cell ${cls}">${Math.floor(Math.random() * 20 + 80)}</div>`;
+            });
+        });
+    }
+
+    // --- FUEL VIEW ---
+    function renderFuelView() {
+        populateKPIRibbon('fuel-kpi-ribbon', [
+            { label: 'Avg Efficiency', value: '5.8 KM/L', status: 'Baseline: 6.0', statusColor: '#ef4444' },
+            { label: 'Fuel Variance', value: '3.4%', status: 'Threshold: 5.0%' },
+            { label: 'Theft Alerts', value: '2', status: 'Critical: 1', statusColor: '#ef4444' }
+        ]);
+
+        if(charts.fuelScatter) charts.fuelScatter.destroy();
+        charts.fuelScatter = new Chart(document.getElementById('fuelScatterChart').getContext('2d'), {
+            type: 'scatter',
+            data: {
+                datasets: [{
+                    label: 'Driver Efficiency',
+                    data: filteredData.map(t => ({ x: t.fuelEfficiency, y: t.idleTime })),
+                    backgroundColor: '#ef533f'
+                }]
+            },
+            options: { scales: { x: { title: { display: true, text: 'Efficiency (KM/L)' } }, y: { title: { display: true, text: 'Idle Time (min)' } } } }
+        });
+
+        const typeData = {};
+        filteredData.forEach(t => {
+            if(!typeData[t.type]) typeData[t.type] = { sum: 0, count: 0 };
+            typeData[t.type].sum += t.fuelEfficiency;
+            typeData[t.type].count += 1;
+        });
+
+        if(charts.fuelType) charts.fuelType.destroy();
+        charts.fuelType = new Chart(document.getElementById('fuelTypeChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: Object.keys(typeData),
+                datasets: [{ label: 'Avg KM/L', data: Object.keys(typeData).map(k => typeData[k].sum / typeData[k].count), backgroundColor: '#10b981' }]
+            }
+        });
+
+        const alerts = document.getElementById('fuel-theft-alerts');
+        alerts.innerHTML = filteredData.slice(0,4).map(t => `<div class="alert-item alert-${t.fuelVariance > 4 ? 'red' : 'amber'}"><div class="time">${t.id}</div><div class="msg">Variance: ${t.fuelVariance}% detected during idle</div></div>`).join('');
+    }
+
+    // --- COMPLIANCE VIEW ---
+    function renderComplianceView() {
+        populateKPIRibbon('compliance-kpi-ribbon', [
+            { label: 'Safe', value: '82%', status: 'Fully Compliant', statusColor: '#10b981' },
+            { label: 'Expiring < 30d', value: '12%', status: 'Action Required', statusColor: '#f59e0b' },
+            { label: 'Expired', value: '6%', status: 'Critical Breach', statusColor: '#ef4444' }
+        ]);
+
+        if(charts.complianceDoughnut) charts.complianceDoughnut.destroy();
+        charts.complianceDoughnut = new Chart(document.getElementById('complianceDoughnutChart').getContext('2d'), {
+            type: 'pie',
+            data: {
+                labels: ['Safe', 'Expiring < 30d', 'Expired'],
+                datasets: [{ data: [82, 12, 6], backgroundColor: ['#10b981', '#f59e0b', '#ef4444'], borderWidth: 0 }]
+            },
+            options: { plugins: { legend: { position: 'bottom' } } }
+        });
+
+        const tbody = document.querySelector('#compliance-table tbody');
+        tbody.innerHTML = '';
+        filteredData.forEach(t => {
+            tbody.innerHTML += `
+                <tr>
+                    <td><strong>${t.id}</strong></td>
+                    <td>${t.insuranceExp}</td>
+                    <td>${t.regExp}</td>
+                    <td>${t.permitExp}</td>
+                </tr>
+            `;
+        });
+    }
+
+    // --- IOT VIEW ---
+    function renderIoTView() {
+        populateKPIRibbon('iot-kpi-ribbon', [
+            { label: 'Active Devices', value: '842', status: 'Uptime: 98.4%' },
+            { label: 'Offline', value: '14', status: 'Priority Fix: 3', statusColor: '#ef4444' },
+            { label: 'Health Score', value: '92/100', status: 'Calibration Needed' }
+        ]);
+
+        if(charts.iotBar) charts.iotBar.destroy();
+        charts.iotBar = new Chart(document.getElementById('iotBarChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: ['GPS', 'Fuel', 'Temp', 'Camera'],
+                datasets: [
+                    { label: 'Active', data: [98, 92, 85, 76], backgroundColor: '#10b981' },
+                    { label: 'Offline', data: [2, 8, 15, 24], backgroundColor: '#ef4444' }
+                ]
+            },
+            options: { scales: { x: { stacked: true }, y: { stacked: true, max: 100 } } }
+        });
+
+        if(charts.iotLine) charts.iotLine.destroy();
+        charts.iotLine = new Chart(document.getElementById('iotLineChart').getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
+                datasets: [{ label: 'Average Ping (ms)', data: [45, 42, 68, 85, 60, 48], borderColor: '#3b82f6', tension: 0.3 }]
+            }
+        });
+
+        const tbody = document.querySelector('#iot-table tbody');
+        tbody.innerHTML = '';
+        filteredData.forEach(t => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong>${t.id}</strong></td>
+                <td><span class="chip chip-${t.iot.gps.toLowerCase()}">${t.iot.gps}</span></td>
+                <td><span class="chip chip-${t.iot.fuel.toLowerCase()}">${t.iot.fuel}</span></td>
+                <td><span class="chip chip-${t.iot.temp.toLowerCase()}">${t.iot.temp}</span></td>
+                <td><span class="chip chip-${t.iot.camera.toLowerCase()}">${t.iot.camera}</span></td>
+                <td><button onclick="triggerRestart('${t.id}')" style="background:#0f172a; color:#fff; border:none; padding:4px 8px; border-radius:4px; font-size:10px; cursor:pointer;">RESTART</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // --- INVESTIGATION DRAWER ---
+    function openInvestigation(truck) {
+        const drawer = document.getElementById('investigation-drawer');
+        document.getElementById('drawer-truck-id').textContent = truck.id;
+        const content = document.getElementById('drawer-content');
+        content.innerHTML = `
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
+                <div class="kpi-card"><div class="kpi-label">Region</div><div class="kpi-value" style="font-size: 16px;">${truck.region}</div></div>
+                <div class="kpi-card"><div class="kpi-label">Driver</div><div class="kpi-value" style="font-size: 16px;">${truck.driver}</div></div>
+            </div>
+            <h4 style="margin-bottom: 12px; font-size: 13px;">TELEMETRY STATUS</h4>
+            <div style="display: flex; gap: 8px; margin-bottom: 24px;">
+                ${Object.entries(truck.iot).map(([k, v]) => `
+                    <div style="flex: 1; text-align: center; padding: 8px; border: 1px solid var(--border); border-radius: 6px;">
+                        <div style="font-size: 9px; font-weight: 700; text-transform: uppercase;">${k}</div>
+                        <div style="font-size: 11px; color: ${v === 'Active' ? '#10b981' : '#ef4444'}; font-weight: 700;">${v}</div>
+                    </div>
+                `).join('')}
+            </div>
+            <h4 style="margin-bottom: 12px; font-size: 13px;">FUEL & PERFORMANCE</h4>
+            <div class="kpi-card" style="margin-bottom: 12px;">
+                <div class="kpi-label">Fuel Efficiency</div>
+                <div class="kpi-value" style="font-size: 24px;">${truck.fuelEfficiency} <span style="font-size: 12px;">KM/L</span></div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Idle Time (Last 24h)</div>
+                <div class="kpi-value" style="font-size: 24px;">${truck.idleTime} <span style="font-size: 12px;">min</span></div>
+            </div>
+        `;
+        drawer.classList.add('open');
+    }
+    document.getElementById('close-drawer').onclick = () => document.getElementById('investigation-drawer').classList.remove('open');
+
+    // --- IOT RESTART WORKFLOW ---
+    window.triggerRestart = function(id) {
+        const truck = FLEET_MASTER_DATA.trucks.find(t => t.id === id);
+        const modal = document.getElementById('modal-overlay');
+        const details = document.getElementById('restart-details');
+        details.innerHTML = `
+            <strong>Device ID:</strong> DEV-${id.split('-')[1]}<br>
+            <strong>Truck:</strong> ${id}<br>
+            <strong>Status:</strong> Offline for 2h 14m<br>
+            <strong>Mapped Sensors:</strong> ${Object.keys(truck.iot).join(', ')}
+        `;
+        modal.style.display = 'flex';
+        document.getElementById('iot-restart-modal').style.display = 'block';
+        document.getElementById('iot-progress-modal').style.display = 'none';
+
+        document.getElementById('confirm-restart').onclick = () => {
+            document.getElementById('iot-restart-modal').style.display = 'none';
+            document.getElementById('iot-progress-modal').style.display = 'block';
+            startRestartTimer();
+        };
+        document.getElementById('cancel-restart').onclick = () => modal.style.display = 'none';
+    };
+
+    function startRestartTimer() {
+        let timeLeft = 300;
+        const timerSpan = document.getElementById('restart-timer');
+        const progressBar = document.getElementById('restart-progress-bar');
+        const stepText = document.getElementById('restart-step');
+        
+        const steps = [
+            'Initializing bypass handshake...',
+            'Sending telemetry ping...',
+            'Authenticating sensor node...',
+            'Re-establishing data stream...',
+            'Syncing regional buffer...'
+        ];
+
+        const interval = setInterval(() => {
+            timeLeft--;
+            const mins = Math.floor(timeLeft / 60);
+            const secs = timeLeft % 60;
+            timerSpan.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            const pct = ((300 - timeLeft) / 300) * 100;
+            progressBar.style.width = `${pct}%`;
+            
+            const stepIdx = Math.floor(pct / 20);
+            if(stepIdx < steps.length) stepText.textContent = `Step: ${steps[stepIdx]}`;
+
+            if(timeLeft <= 0) {
+                clearInterval(interval);
+                document.getElementById('modal-overlay').style.display = 'none';
+                addAlert('IoT Device Recovered Successfully', 'green');
+            }
+        }, 10);
+    }
+
+    // --- ALERTS ---
+    function addAlert(msg, severity) {
+        const list = document.getElementById('global-alert-list');
+        const item = document.createElement('div');
+        item.className = `alert-item alert-${severity}`;
+        item.innerHTML = `<div class="time">${new Date().toLocaleTimeString()}</div><div class="msg">${msg}</div>`;
+        list.prepend(item);
+    }
+
+    function initAlerts() {
+        const rawAlerts = [
+            { msg: 'NXX-9876 entered critical runtime zone', sev: 'red' },
+            { msg: 'Fuel sensor offline - Cebu', sev: 'amber' },
+            { msg: 'Insurance expiry in 3 days - KLM-2345', sev: 'amber' },
+            { msg: 'GPS reconnected - NCR', sev: 'green' }
+        ];
+        rawAlerts.forEach(a => addAlert(a.msg, a.sev));
+    }
+
+    // --- INITIALIZE ALL ---
+    function renderActiveView(target) {
+        if(target === 'reefer') renderReeferView();
+        else if(target === 'maintenance') renderMaintenanceView();
+        else if(target === 'fuel') renderFuelView();
+        else if(target === 'compliance') renderComplianceView();
+        else if(target === 'iot') renderIoTView();
+    }
+
+    initFilters();
+    initAlerts();
+    renderActiveView('reefer');
+});
