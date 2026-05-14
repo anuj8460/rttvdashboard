@@ -6,13 +6,30 @@ document.addEventListener('DOMContentLoaded', () => {
         status: 'all',
         dateRange: '30'
     };
+
+    // Generate mock safety data
+    FLEET_MASTER_DATA.trucks.forEach(t => {
+        if (!t.safety) {
+            t.safety = {
+                harshBraking: Math.floor(Math.random() * 6),
+                speeding: Math.floor(Math.random() * 10),
+                microsleep: Math.floor(Math.random() * 4),
+                score: Math.floor(Math.random() * 25 + 75) // 75 to 100
+            };
+            if (t.safety.microsleep > 1 || t.safety.score < 80) t.safety.fatigueRisk = 'High';
+            else if (t.safety.microsleep === 1 || t.safety.score < 88) t.safety.fatigueRisk = 'Medium';
+            else t.safety.fatigueRisk = 'Low';
+        }
+    });
+
     let filteredData = [...FLEET_MASTER_DATA.trucks];
     let charts = {};
     let tableFilters = {
         runtimeRange: null, // e.g. [0, 1000]
         maintStatus: null, // Added for maintenance chart filter
         complianceStatus: null,
-        iotFilter: null
+        iotFilter: null,
+        safetyRisk: null
     };
 
     // --- NAVIGATION & UI HELPERS ---
@@ -32,6 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tableFilters.maintStatus = null;
             tableFilters.complianceStatus = null;
             tableFilters.iotFilter = null;
+            tableFilters.safetyRisk = null;
             if(document.getElementById('clear-table-filter')) document.getElementById('clear-table-filter').style.display = 'none';
             if(document.getElementById('clear-maint-filter')) document.getElementById('clear-maint-filter').style.display = 'none';
             if(document.getElementById('maint-table-title')) document.getElementById('maint-table-title').textContent = 'Upcoming Maintenance Schedule';
@@ -39,6 +57,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if(document.getElementById('compliance-table-title')) document.getElementById('compliance-table-title').textContent = 'Compliance Expiry Details';
             if(document.getElementById('clear-iot-filter')) document.getElementById('clear-iot-filter').style.display = 'none';
             if(document.getElementById('iot-table-title')) document.getElementById('iot-table-title').textContent = 'Device Inventory & Action';
+            if(document.getElementById('clear-safety-filter')) document.getElementById('clear-safety-filter').style.display = 'none';
+            if(document.getElementById('safety-table-title')) document.getElementById('safety-table-title').textContent = 'Driver Safety Scorecard';
             renderActiveView(target);
         });
     });
@@ -519,6 +539,100 @@ document.addEventListener('DOMContentLoaded', () => {
         renderIoTTable();
     }
 
+    // --- SAFETY VIEW ---
+    function renderSafetyView() {
+        const totalScore = filteredData.reduce((sum, t) => sum + t.safety.score, 0);
+        const avgScore = filteredData.length ? (totalScore / filteredData.length).toFixed(1) : 0;
+        const totalEvents = filteredData.reduce((sum, t) => sum + t.safety.harshBraking + t.safety.speeding, 0);
+        const highRisk = filteredData.filter(t => t.safety.fatigueRisk === 'High').length;
+
+        populateKPIRibbon('safety-kpi-ribbon', [
+            { label: 'Avg Safety Score', value: `${avgScore}/100`, status: avgScore > 90 ? 'Excellent' : 'Needs Improvement', statusColor: avgScore > 90 ? '#10b981' : '#f59e0b' },
+            { label: 'High Risk Drivers', value: highRisk, status: 'Immediate Action', statusColor: highRisk > 0 ? '#ef4444' : '#10b981' },
+            { label: 'Total Critical Events', value: totalEvents, status: 'Last 30 Days' }
+        ]);
+
+        const regions = [...new Set(filteredData.map(t => t.region))];
+        const brakingByRegion = regions.map(r => filteredData.filter(t => t.region === r).reduce((sum, t) => sum + t.safety.harshBraking, 0));
+        const speedingByRegion = regions.map(r => filteredData.filter(t => t.region === r).reduce((sum, t) => sum + t.safety.speeding, 0));
+
+        if(charts.safetyEvents) charts.safetyEvents.destroy();
+        charts.safetyEvents = new Chart(document.getElementById('safetyEventsChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: regions,
+                datasets: [
+                    { label: 'Harsh Braking', data: brakingByRegion, backgroundColor: '#f59e0b' },
+                    { label: 'Speeding', data: speedingByRegion, backgroundColor: '#ef4444' }
+                ]
+            },
+            options: { plugins: { legend: { position: 'bottom' } } }
+        });
+
+        const fatigueCounts = { 'Low': 0, 'Medium': 0, 'High': 0 };
+        filteredData.forEach(t => fatigueCounts[t.safety.fatigueRisk]++);
+        const fatigueLabels = ['Low', 'Medium', 'High'];
+
+        if(charts.fatigueRisk) charts.fatigueRisk.destroy();
+        charts.fatigueRisk = new Chart(document.getElementById('fatigueRiskChart').getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: fatigueLabels,
+                datasets: [{ data: [fatigueCounts.Low, fatigueCounts.Medium, fatigueCounts.High], backgroundColor: ['#10b981', '#f59e0b', '#ef4444'], borderWidth: 0 }]
+            },
+            options: {
+                cutout: '70%',
+                plugins: { legend: { position: 'right' } },
+                onClick: (event, elements) => {
+                    if (elements.length > 0) {
+                        const selectedRisk = fatigueLabels[elements[0].index];
+                        tableFilters.safetyRisk = selectedRisk;
+                        document.getElementById('clear-safety-filter').style.display = 'block';
+                        document.getElementById('safety-table-title').textContent = `Scorecard (Filtered: ${selectedRisk} Risk)`;
+                        renderSafetyTable();
+                    }
+                }
+            }
+        });
+
+        document.getElementById('clear-safety-filter').onclick = () => {
+            tableFilters.safetyRisk = null;
+            document.getElementById('clear-safety-filter').style.display = 'none';
+            document.getElementById('safety-table-title').textContent = 'Driver Safety Scorecard';
+            renderSafetyTable();
+        };
+
+        renderSafetyTable();
+    }
+
+    function renderSafetyTable() {
+        const tbody = document.querySelector('#safety-table tbody');
+        tbody.innerHTML = '';
+
+        let displayData = filteredData;
+        if (tableFilters.safetyRisk) {
+            displayData = filteredData.filter(t => t.safety.fatigueRisk === tableFilters.safetyRisk);
+        }
+
+        const sortedData = [...displayData].sort((a, b) => a.safety.score - b.safety.score); // Lowest score first
+
+        sortedData.forEach(t => {
+            let scoreColor = t.safety.score >= 90 ? 'green' : (t.safety.score >= 80 ? 'amber' : 'red');
+            let microColor = t.safety.microsleep > 0 ? 'red' : 'green';
+            tbody.innerHTML += `
+                <tr>
+                    <td><strong>${t.driver}</strong></td>
+                    <td>${t.region}</td>
+                    <td>${t.id}</td>
+                    <td>${t.safety.harshBraking}</td>
+                    <td>${t.safety.speeding}</td>
+                    <td><span style="color: var(--${microColor}); font-weight: bold;">${t.safety.microsleep}</span></td>
+                    <td><span class="chip chip-${scoreColor}">${t.safety.score}/100</span></td>
+                </tr>
+            `;
+        });
+    }
+
     function renderIoTTable() {
         const tbody = document.querySelector('#iot-table tbody');
         tbody.innerHTML = '';
@@ -657,6 +771,7 @@ document.addEventListener('DOMContentLoaded', () => {
         else if(target === 'fuel') renderFuelView();
         else if(target === 'compliance') renderComplianceView();
         else if(target === 'iot') renderIoTView();
+        else if(target === 'safety') renderSafetyView();
     }
 
     // --- LIVE FEED TOGGLE ---
