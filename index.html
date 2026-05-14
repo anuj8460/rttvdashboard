@@ -149,7 +149,10 @@
                                 <canvas id="complianceDoughnutChart" height="250"></canvas>
                             </div>
                             <div class="widget" style="grid-column: span 6;">
-                                <div class="widget-header"><div class="widget-title">Compliance Expiry Details</div></div>
+                                <div class="widget-header">
+                                    <div class="widget-title" id="compliance-table-title">Compliance Expiry Details</div>
+                                    <button id="clear-compliance-filter" style="display:none; font-size:12px; padding:4px 8px; background:var(--bg-main); border:1px solid var(--border); border-radius:4px; cursor:pointer;">Clear Filter</button>
+                                </div>
                                 <div class="table-container">
                                     <table id="compliance-table">
                                         <thead><tr><th>Truck #</th><th>Insurance</th><th>Registration</th><th>Permit</th></tr></thead>
@@ -173,7 +176,10 @@
                                 <canvas id="iotLineChart" height="200"></canvas>
                             </div>
                             <div class="widget" style="grid-column: span 12;">
-                                <div class="widget-header"><div class="widget-title">Device Inventory & Action</div></div>
+                                <div class="widget-header">
+                                    <div class="widget-title" id="iot-table-title">Device Inventory & Action</div>
+                                    <button id="clear-iot-filter" style="display:none; font-size:12px; padding:4px 8px; background:var(--bg-main); border:1px solid var(--border); border-radius:4px; cursor:pointer;">Clear Filter</button>
+                                </div>
                                 <div class="table-container">
                                     <table id="iot-table">
                                         <thead><tr><th>Truck #</th><th>GPS</th><th>Fuel</th><th>Temp</th><th>Camera</th><th>Action</th></tr></thead>

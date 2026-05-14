@@ -10,7 +10,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let charts = {};
     let tableFilters = {
         runtimeRange: null, // e.g. [0, 1000]
-        maintStatus: null // Added for maintenance chart filter
+        maintStatus: null, // Added for maintenance chart filter
+        complianceStatus: null,
+        iotFilter: null
     };
 
     // --- NAVIGATION & UI HELPERS ---
@@ -28,9 +30,15 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             tableFilters.runtimeRange = null; // Reset table filters on view change
             tableFilters.maintStatus = null;
+            tableFilters.complianceStatus = null;
+            tableFilters.iotFilter = null;
             if(document.getElementById('clear-table-filter')) document.getElementById('clear-table-filter').style.display = 'none';
             if(document.getElementById('clear-maint-filter')) document.getElementById('clear-maint-filter').style.display = 'none';
             if(document.getElementById('maint-table-title')) document.getElementById('maint-table-title').textContent = 'Upcoming Maintenance Schedule';
+            if(document.getElementById('clear-compliance-filter')) document.getElementById('clear-compliance-filter').style.display = 'none';
+            if(document.getElementById('compliance-table-title')) document.getElementById('compliance-table-title').textContent = 'Compliance Expiry Details';
+            if(document.getElementById('clear-iot-filter')) document.getElementById('clear-iot-filter').style.display = 'none';
+            if(document.getElementById('iot-table-title')) document.getElementById('iot-table-title').textContent = 'Device Inventory & Action';
             renderActiveView(target);
         });
     });
@@ -351,25 +359,79 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- COMPLIANCE VIEW ---
     function renderComplianceView() {
+        const now = new Date('2026-05-14');
+        const getTruckStatus = (t) => {
+            const dates = [new Date(t.insuranceExp), new Date(t.regExp), new Date(t.permitExp)];
+            const minDiff = Math.min(...dates.map(d => (d - now) / (1000 * 60 * 60 * 24)));
+            if (minDiff < 0) return 'Expired';
+            if (minDiff <= 30) return 'Expiring < 30d';
+            return 'Safe';
+        };
+
+        const statusCounts = { 'Safe': 0, 'Expiring < 30d': 0, 'Expired': 0 };
+        filteredData.forEach(t => statusCounts[getTruckStatus(t)]++);
+        
+        const total = filteredData.length || 1;
+        
         populateKPIRibbon('compliance-kpi-ribbon', [
-            { label: 'Safe', value: '82%', status: 'Fully Compliant', statusColor: '#10b981' },
-            { label: 'Expiring < 30d', value: '12%', status: 'Action Required', statusColor: '#f59e0b' },
-            { label: 'Expired', value: '6%', status: 'Critical Breach', statusColor: '#ef4444' }
+            { label: 'Safe', value: `${Math.round((statusCounts['Safe']/total)*100)}%`, status: 'Fully Compliant', statusColor: '#10b981' },
+            { label: 'Expiring < 30d', value: `${statusCounts['Expiring < 30d']} Trucks`, status: 'Action Required', statusColor: '#f59e0b' },
+            { label: 'Expired', value: `${statusCounts['Expired']} Trucks`, status: 'Critical Breach', statusColor: '#ef4444' }
         ]);
+
+        const chartLabels = ['Safe', 'Expiring < 30d', 'Expired'];
 
         if(charts.complianceDoughnut) charts.complianceDoughnut.destroy();
         charts.complianceDoughnut = new Chart(document.getElementById('complianceDoughnutChart').getContext('2d'), {
             type: 'pie',
             data: {
-                labels: ['Safe', 'Expiring < 30d', 'Expired'],
-                datasets: [{ data: [82, 12, 6], backgroundColor: ['#10b981', '#f59e0b', '#ef4444'], borderWidth: 0 }]
+                labels: chartLabels,
+                datasets: [{ data: [statusCounts['Safe'], statusCounts['Expiring < 30d'], statusCounts['Expired']], backgroundColor: ['#10b981', '#f59e0b', '#ef4444'], borderWidth: 0 }]
             },
-            options: { plugins: { legend: { position: 'bottom' } } }
+            options: { 
+                plugins: { legend: { position: 'bottom' } },
+                onClick: (event, elements) => {
+                    if (elements.length > 0) {
+                        const idx = elements[0].index;
+                        const selectedStatus = chartLabels[idx];
+                        tableFilters.complianceStatus = selectedStatus;
+                        document.getElementById('clear-compliance-filter').style.display = 'block';
+                        document.getElementById('compliance-table-title').textContent = `Compliance Expiry Details (Filtered: ${selectedStatus})`;
+                        renderComplianceTable();
+                    }
+                }
+            }
         });
 
+        document.getElementById('clear-compliance-filter').onclick = () => {
+            tableFilters.complianceStatus = null;
+            document.getElementById('clear-compliance-filter').style.display = 'none';
+            document.getElementById('compliance-table-title').textContent = 'Compliance Expiry Details';
+            renderComplianceTable();
+        };
+
+        renderComplianceTable();
+    }
+
+    function renderComplianceTable() {
         const tbody = document.querySelector('#compliance-table tbody');
         tbody.innerHTML = '';
-        filteredData.forEach(t => {
+        const now = new Date('2026-05-14');
+        
+        const getTruckStatus = (t) => {
+            const dates = [new Date(t.insuranceExp), new Date(t.regExp), new Date(t.permitExp)];
+            const minDiff = Math.min(...dates.map(d => (d - now) / (1000 * 60 * 60 * 24)));
+            if (minDiff < 0) return 'Expired';
+            if (minDiff <= 30) return 'Expiring < 30d';
+            return 'Safe';
+        };
+
+        let displayData = filteredData;
+        if (tableFilters.complianceStatus) {
+            displayData = filteredData.filter(t => getTruckStatus(t) === tableFilters.complianceStatus);
+        }
+
+        displayData.forEach(t => {
             tbody.innerHTML += `
                 <tr>
                     <td><strong>${t.id}</strong></td>
@@ -383,23 +445,59 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- IOT VIEW ---
     function renderIoTView() {
+        let sensors = {
+            gps: { active: 0, offline: 0 },
+            fuel: { active: 0, offline: 0 },
+            temp: { active: 0, offline: 0 },
+            camera: { active: 0, offline: 0 }
+        };
+
+        filteredData.forEach(t => {
+            if(t.iot.gps === 'Active') sensors.gps.active++; else sensors.gps.offline++;
+            if(t.iot.fuel === 'Active') sensors.fuel.active++; else sensors.fuel.offline++;
+            if(t.iot.temp === 'Active') sensors.temp.active++; else sensors.temp.offline++;
+            if(t.iot.camera === 'Active') sensors.camera.active++; else sensors.camera.offline++;
+        });
+
+        const totalOffline = sensors.gps.offline + sensors.fuel.offline + sensors.temp.offline + sensors.camera.offline;
+        const totalSensors = filteredData.length * 4;
+        const activePct = totalSensors > 0 ? ((totalSensors - totalOffline) / totalSensors * 100).toFixed(1) : 0;
+
         populateKPIRibbon('iot-kpi-ribbon', [
-            { label: 'Active Devices', value: '842', status: 'Uptime: 98.4%' },
-            { label: 'Offline', value: '14', status: 'Priority Fix: 3', statusColor: '#ef4444' },
+            { label: 'Total Sensors', value: totalSensors, status: `Uptime: ${activePct}%` },
+            { label: 'Offline Components', value: totalOffline, status: 'Needs Attention', statusColor: totalOffline > 0 ? '#ef4444' : '#10b981' },
             { label: 'Health Score', value: '92/100', status: 'Calibration Needed' }
         ]);
+
+        const chartLabels = ['gps', 'fuel', 'temp', 'camera'];
+        const displayLabels = ['GPS', 'Fuel', 'Temp', 'Camera'];
 
         if(charts.iotBar) charts.iotBar.destroy();
         charts.iotBar = new Chart(document.getElementById('iotBarChart').getContext('2d'), {
             type: 'bar',
             data: {
-                labels: ['GPS', 'Fuel', 'Temp', 'Camera'],
+                labels: displayLabels,
                 datasets: [
-                    { label: 'Active', data: [98, 92, 85, 76], backgroundColor: '#10b981' },
-                    { label: 'Offline', data: [2, 8, 15, 24], backgroundColor: '#ef4444' }
+                    { label: 'Active', data: [sensors.gps.active, sensors.fuel.active, sensors.temp.active, sensors.camera.active], backgroundColor: '#10b981' },
+                    { label: 'Offline', data: [sensors.gps.offline, sensors.fuel.offline, sensors.temp.offline, sensors.camera.offline], backgroundColor: '#ef4444' }
                 ]
             },
-            options: { scales: { x: { stacked: true }, y: { stacked: true, max: 100 } } }
+            options: { 
+                scales: { x: { stacked: true }, y: { stacked: true } },
+                onClick: (event, elements) => {
+                    if (elements.length > 0) {
+                        const datasetIndex = elements[0].datasetIndex;
+                        const idx = elements[0].index;
+                        const sensorType = chartLabels[idx];
+                        const statusClicked = datasetIndex === 0 ? 'Active' : 'Offline';
+                        
+                        tableFilters.iotFilter = { sensor: sensorType, status: statusClicked };
+                        document.getElementById('clear-iot-filter').style.display = 'block';
+                        document.getElementById('iot-table-title').textContent = `Device Inventory (Filtered: ${displayLabels[idx]} is ${statusClicked})`;
+                        renderIoTTable();
+                    }
+                }
+            }
         });
 
         if(charts.iotLine) charts.iotLine.destroy();
@@ -411,9 +509,26 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        document.getElementById('clear-iot-filter').onclick = () => {
+            tableFilters.iotFilter = null;
+            document.getElementById('clear-iot-filter').style.display = 'none';
+            document.getElementById('iot-table-title').textContent = 'Device Inventory & Action';
+            renderIoTTable();
+        };
+
+        renderIoTTable();
+    }
+
+    function renderIoTTable() {
         const tbody = document.querySelector('#iot-table tbody');
         tbody.innerHTML = '';
-        filteredData.forEach(t => {
+        
+        let displayData = filteredData;
+        if (tableFilters.iotFilter) {
+            displayData = filteredData.filter(t => t.iot[tableFilters.iotFilter.sensor] === tableFilters.iotFilter.status);
+        }
+
+        displayData.forEach(t => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td><strong>${t.id}</strong></td>
