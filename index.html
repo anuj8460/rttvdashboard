@@ -99,7 +99,10 @@
                         <div class="kpi-ribbon" id="maintenance-kpi-ribbon"></div>
                         <div class="widget-grid">
                             <div class="widget" style="grid-column: span 6;">
-                                <div class="widget-header"><div class="widget-title">Upcoming Maintenance Schedule</div></div>
+                                <div class="widget-header">
+                                    <div class="widget-title" id="maint-table-title">Upcoming Maintenance Schedule</div>
+                                    <button id="clear-maint-filter" style="display:none; font-size:12px; padding:4px 8px; background:var(--bg-main); border:1px solid var(--border); border-radius:4px; cursor:pointer;">Clear Filter</button>
+                                </div>
                                 <div class="table-container" style="max-height: 250px;">
                                     <table id="maintenance-schedule-table">
                                         <thead><tr><th>Truck #</th><th>Region</th><th>Due Date</th><th>Status</th></tr></thead>

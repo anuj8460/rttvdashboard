@@ -9,7 +9,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let filteredData = [...FLEET_MASTER_DATA.trucks];
     let charts = {};
     let tableFilters = {
-        runtimeRange: null // e.g. [0, 1000]
+        runtimeRange: null, // e.g. [0, 1000]
+        maintStatus: null // Added for maintenance chart filter
     };
 
     // --- NAVIGATION & UI HELPERS ---
@@ -26,6 +27,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if(v.id === `view-${target}`) v.classList.add('active');
             });
             tableFilters.runtimeRange = null; // Reset table filters on view change
+            tableFilters.maintStatus = null;
+            if(document.getElementById('clear-table-filter')) document.getElementById('clear-table-filter').style.display = 'none';
+            if(document.getElementById('clear-maint-filter')) document.getElementById('clear-maint-filter').style.display = 'none';
+            if(document.getElementById('maint-table-title')) document.getElementById('maint-table-title').textContent = 'Upcoming Maintenance Schedule';
             renderActiveView(target);
         });
     });
@@ -223,10 +228,69 @@ document.addEventListener('DOMContentLoaded', () => {
             { label: 'Compliance', value: '94.2%', status: 'Target: 95%' }
         ]);
 
-        // Upcoming Maintenance Table
+        // Service Status Chart based on actual data
+        const counts = { 'Healthy': 0, 'Monitor': 0, 'Warning': 0, 'Critical': 0 };
+        filteredData.forEach(t => counts[t.maintStatus]++);
+        const chartLabels = ['Healthy', 'Monitor', 'Warning', 'Critical'];
+
+        if(charts.maintenanceStatus) charts.maintenanceStatus.destroy();
+        charts.maintenanceStatus = new Chart(document.getElementById('maintenanceStatusChart').getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: chartLabels,
+                datasets: [{ data: [counts.Healthy, counts.Monitor, counts.Warning, counts.Critical], backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'], borderWidth: 0 }]
+            },
+            options: { 
+                cutout: '70%', 
+                plugins: { legend: { position: 'right' } },
+                onClick: (event, elements) => {
+                    if (elements.length > 0) {
+                        const idx = elements[0].index;
+                        const selectedStatus = chartLabels[idx];
+                        tableFilters.maintStatus = selectedStatus;
+                        document.getElementById('clear-maint-filter').style.display = 'block';
+                        document.getElementById('maint-table-title').textContent = `Upcoming Maintenance (Filtered: ${selectedStatus})`;
+                        renderMaintenanceTable();
+                    }
+                }
+            }
+        });
+
+        document.getElementById('clear-maint-filter').onclick = () => {
+            tableFilters.maintStatus = null;
+            document.getElementById('clear-maint-filter').style.display = 'none';
+            document.getElementById('maint-table-title').textContent = 'Upcoming Maintenance Schedule';
+            renderMaintenanceTable();
+        };
+
+        renderMaintenanceTable();
+
+        const heatmap = document.getElementById('maintenance-heatmap');
+        heatmap.style.gridTemplateColumns = `120px repeat(${FLEET_MASTER_DATA.regions.length}, 1fr)`;
+        heatmap.innerHTML = `<div></div>${FLEET_MASTER_DATA.regions.map(r => `<div style="font-size: 10px; font-weight: 700; text-align: center;">${r}</div>`).join('')}`;
+        
+        ['Engine', 'Transmission', 'Reefer Unit', 'GPS / Telematics'].forEach(asset => {
+            heatmap.innerHTML += `<div style="font-size: 11px; font-weight: 600; padding: 4px 0;">${asset}</div>`;
+            FLEET_MASTER_DATA.regions.forEach(r => {
+                const score = Math.floor(Math.random() * 3);
+                const cls = score === 0 ? 'cell-green' : (score === 1 ? 'cell-amber' : 'cell-red');
+                heatmap.innerHTML += `<div class="heatmap-cell ${cls}">${Math.floor(Math.random() * 20 + 80)}</div>`;
+            });
+        });
+    }
+
+    function renderMaintenanceTable() {
         const tbody = document.querySelector('#maintenance-schedule-table tbody');
         tbody.innerHTML = '';
-        const sortedSchedule = [...filteredData].sort((a, b) => new Date(a.nextMaint) - new Date(b.nextMaint)).slice(0, 8);
+        
+        let displayData = [...filteredData];
+        if (tableFilters.maintStatus) {
+            displayData = displayData.filter(t => t.maintStatus === tableFilters.maintStatus);
+        }
+
+        const now = new Date('2026-05-14');
+        const sortedSchedule = displayData.sort((a, b) => new Date(a.nextMaint) - new Date(b.nextMaint)).slice(0, 15);
+        
         sortedSchedule.forEach(t => {
             const d = new Date(t.nextMaint);
             const diffDays = Math.ceil((d - now) / (1000 * 60 * 60 * 24));
@@ -241,33 +305,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td><span class="chip chip-${statusColor}">${statusText}</span></td>
                 </tr>
             `;
-        });
-
-        // Service Status Chart based on actual data
-        const counts = { 'Healthy': 0, 'Monitor': 0, 'Warning': 0, 'Critical': 0 };
-        filteredData.forEach(t => counts[t.maintStatus]++);
-
-        if(charts.maintenanceStatus) charts.maintenanceStatus.destroy();
-        charts.maintenanceStatus = new Chart(document.getElementById('maintenanceStatusChart').getContext('2d'), {
-            type: 'doughnut',
-            data: {
-                labels: ['Healthy', 'Monitor', 'Warning', 'Critical'],
-                datasets: [{ data: [counts.Healthy, counts.Monitor, counts.Warning, counts.Critical], backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'], borderWidth: 0 }]
-            },
-            options: { cutout: '70%', plugins: { legend: { position: 'right' } } }
-        });
-
-        const heatmap = document.getElementById('maintenance-heatmap');
-        heatmap.style.gridTemplateColumns = `120px repeat(${FLEET_MASTER_DATA.regions.length}, 1fr)`;
-        heatmap.innerHTML = `<div></div>${FLEET_MASTER_DATA.regions.map(r => `<div style="font-size: 10px; font-weight: 700; text-align: center;">${r}</div>`).join('')}`;
-        
-        ['Engine', 'Transmission', 'Reefer Unit', 'GPS / Telematics'].forEach(asset => {
-            heatmap.innerHTML += `<div style="font-size: 11px; font-weight: 600; padding: 4px 0;">${asset}</div>`;
-            FLEET_MASTER_DATA.regions.forEach(r => {
-                const score = Math.floor(Math.random() * 3);
-                const cls = score === 0 ? 'cell-green' : (score === 1 ? 'cell-amber' : 'cell-red');
-                heatmap.innerHTML += `<div class="heatmap-cell ${cls}">${Math.floor(Math.random() * 20 + 80)}</div>`;
-            });
         });
     }
 
