@@ -124,77 +124,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- REEFER RUNTIME VIEW ---
-    function renderReeferView() {
-        const total = filteredData.length;
-        if(total === 0) return;
-
-        const downCount = filteredData.filter(t => t.maintStatus === 'Critical').length;
-        const avgRuntime = Math.round(filteredData.reduce((acc, t) => acc + t.runtime, 0) / total);
-        
-        populateKPIRibbon('reefer-kpi-ribbon', [
-            { label: 'Total Fleet', value: total, status: `Active: ${total - downCount} | Down: ${downCount}`, statusColor: downCount > 0 ? '#ef4444' : '#10b981' },
-            { label: 'Avg Runtime', value: `${avgRuntime}h`, status: 'Current Avg: 8.2h/day' },
-            { label: 'Fleet Risk', value: `${downCount}`, status: 'Trucks at Risk', statusColor: '#ef4444' },
-            { label: 'Maint. Compliance', value: '92.4%', status: 'Target: 95%' }
-        ]);
-
-        // Make the "Down" status clickable via the KPI ribbon wrapper
-        const downKpiCard = document.querySelectorAll('#reefer-kpi-ribbon .kpi-card')[0];
-        if (downKpiCard) {
-            downKpiCard.style.cursor = 'pointer';
-            downKpiCard.title = "Click to filter 'Down' trucks";
-            downKpiCard.onclick = () => {
-                tableFilters.status = 'Critical';
-                document.getElementById('clear-table-filter').style.display = 'block';
-                document.getElementById('table-title').textContent = `Truck Investigation Ledger (Filtered: Down Trucks)`;
-                renderReeferTable();
-            };
-        }
-
-        // Risk Bands (Interactive) mapped to maintStatus
-        const riskContainer = document.getElementById('runtime-risk-bands');
-        riskContainer.innerHTML = '';
-        
-        const bands = [
-            { id: 'Healthy', label: 'Healthy (Optimal)', color: '#10b981' },
-            { id: 'Monitor', label: 'Monitor (Moderate Use)', color: '#3b82f6' },
-            { id: 'Warning', label: 'Warning (High Use)', color: '#f59e0b' },
-            { id: 'Critical', label: 'Critical (Down/Overdue)', color: '#ef4444' }
-        ];
-
-        bands.forEach(b => {
-            const count = filteredData.filter(t => t.maintStatus === b.id).length;
-            const pct = (count / total) * 100 || 0;
-            const row = document.createElement('div');
-            row.className = 'risk-band';
-            row.style.cursor = 'pointer';
-            row.innerHTML = `
-                <div class="risk-label" style="width: 150px;">${b.label}</div>
-                <div class="risk-bar-bg"><div class="risk-bar-fill" style="width: ${pct}%; background: ${b.color};"></div></div>
-                <div class="risk-count">${count} Trucks</div>
-                <div class="risk-percent">${pct.toFixed(1)}%</div>
-            `;
-            row.onclick = () => {
-                tableFilters.status = b.id;
-                document.getElementById('clear-table-filter').style.display = 'block';
-                document.getElementById('table-title').textContent = `Truck Investigation Ledger (Filtered: ${b.label})`;
-                renderReeferTable();
-            };
-            riskContainer.appendChild(row);
-        });
-
-        document.getElementById('clear-table-filter').onclick = () => {
-            tableFilters.status = null;
-            document.getElementById('clear-table-filter').style.display = 'none';
-            document.getElementById('table-title').textContent = 'Truck Investigation Ledger';
-            renderReeferTable();
-        };
-
-        // Average Runtime by Region Chart
-        const regionData = {};
-        filteredData.forEach(t => {
-            if(!regionData[t.region]) regionData[t.region] = { sum: 0, count: 0 };
     // --- MAINTENANCE VIEW ---
     function renderMaintenanceView() {
         // Calculate upcoming maintenance
@@ -334,23 +263,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const alerts = document.getElementById('fuel-theft-alerts');
         alerts.innerHTML = filteredData.slice(0,4).map(t => `<div class="alert-item alert-${t.fuelVariance > 4 ? 'red' : 'amber'}"><div class="time">${t.id}</div><div class="msg">Variance: ${t.fuelVariance}% detected during idle</div></div>`).join('');
     }
-
-        }
-
-        displayData.forEach(t => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td><strong>${t.id}</strong></td>
-                <td><span class="chip chip-${t.iot.gps.toLowerCase()}">${t.iot.gps}</span></td>
-                <td><span class="chip chip-${t.iot.fuel.toLowerCase()}">${t.iot.fuel}</span></td>
-                <td><span class="chip chip-${t.iot.temp.toLowerCase()}">${t.iot.temp}</span></td>
-                <td><span class="chip chip-${t.iot.camera.toLowerCase()}">${t.iot.camera}</span></td>
-                <td><button onclick="triggerRestart('${t.id}')" style="background:#0f172a; color:#fff; border:none; padding:4px 8px; border-radius:4px; font-size:10px; cursor:pointer;">RESTART</button></td>
-            `;
-            tbody.appendChild(tr);
-        });
-    }
-
     // --- INVESTIGATION DRAWER ---
     function openInvestigation(truck) {
         const drawer = document.getElementById('investigation-drawer');
