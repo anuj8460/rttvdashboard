@@ -208,7 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 labels: labels,
                 datasets: [{ label: 'Avg Runtime (h)', data: data, backgroundColor: '#3b82f6', borderRadius: 4 }]
             },
-            options: { scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
+            options: { maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
         });
 
         renderReeferTable();
@@ -269,6 +269,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 datasets: [{ data: [counts.Healthy, counts.Monitor, counts.Warning, counts.Critical], backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'], borderWidth: 0 }]
             },
             options: { 
+                maintainAspectRatio: false,
                 cutout: '70%', 
                 plugins: { legend: { position: 'right' } },
                 onClick: (event, elements) => {
@@ -354,7 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     backgroundColor: '#ef533f'
                 }]
             },
-            options: { scales: { x: { title: { display: true, text: 'Efficiency (KM/L)' } }, y: { title: { display: true, text: 'Idle Time (min)' } } } }
+            options: { maintainAspectRatio: false, scales: { x: { title: { display: true, text: 'Efficiency (KM/L)' } }, y: { title: { display: true, text: 'Idle Time (min)' } } } }
         });
 
         const typeData = {};
@@ -370,7 +371,8 @@ document.addEventListener('DOMContentLoaded', () => {
             data: {
                 labels: Object.keys(typeData),
                 datasets: [{ label: 'Avg KM/L', data: Object.keys(typeData).map(k => typeData[k].sum / typeData[k].count), backgroundColor: '#10b981' }]
-            }
+            },
+            options: { maintainAspectRatio: false }
         });
 
         const alerts = document.getElementById('fuel-theft-alerts');
@@ -409,6 +411,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 datasets: [{ data: [statusCounts['Safe'], statusCounts['Expiring < 30d'], statusCounts['Expired']], backgroundColor: ['#10b981', '#f59e0b', '#ef4444'], borderWidth: 0 }]
             },
             options: { 
+                maintainAspectRatio: false,
                 plugins: { legend: { position: 'bottom' } },
                 onClick: (event, elements) => {
                     if (elements.length > 0) {
@@ -503,7 +506,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 ]
             },
             options: { 
-                scales: { x: { stacked: true }, y: { stacked: true } },
+                maintainAspectRatio: false,
+                scales: { x: { stacked: true }, y: { stacked: true, max: 100 } },
                 onClick: (event, elements) => {
                     if (elements.length > 0) {
                         const datasetIndex = elements[0].datasetIndex;
@@ -526,7 +530,8 @@ document.addEventListener('DOMContentLoaded', () => {
             data: {
                 labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
                 datasets: [{ label: 'Average Ping (ms)', data: [45, 42, 68, 85, 60, 48], borderColor: '#3b82f6', tension: 0.3 }]
-            }
+            },
+            options: { maintainAspectRatio: false }
         });
 
         document.getElementById('clear-iot-filter').onclick = () => {
@@ -566,7 +571,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     { label: 'Speeding', data: speedingByRegion, backgroundColor: '#ef4444' }
                 ]
             },
-            options: { plugins: { legend: { position: 'bottom' } } }
+            options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
         });
 
         const fatigueCounts = { 'Low': 0, 'Medium': 0, 'High': 0 };
@@ -581,6 +586,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 datasets: [{ data: [fatigueCounts.Low, fatigueCounts.Medium, fatigueCounts.High], backgroundColor: ['#10b981', '#f59e0b', '#ef4444'], borderWidth: 0 }]
             },
             options: {
+                maintainAspectRatio: false,
                 cutout: '70%',
                 plugins: { legend: { position: 'right' } },
                 onClick: (event, elements) => {
