@@ -1,4 +1,11 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // --- CHART DEFAULTS FOR DARK MODE ---
+    if (typeof Chart !== 'undefined') {
+        Chart.defaults.color = '#94a3b8'; // Slate 400
+        Chart.defaults.scale.grid.color = '#334155'; // Slate 700
+        Chart.defaults.scale.grid.borderColor = '#334155';
+    }
+
     // --- STATE MANAGEMENT ---
     let currentFilters = {
         region: 'all',
@@ -121,6 +128,79 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="kpi-status" style="color: ${k.statusColor || '#64748b'}">${k.status || ''}</div>
             `;
             container.appendChild(card);
+        });
+    }
+
+    // --- EXECUTIVE SUMMARY VIEW ---
+    function renderExecutiveView() {
+        const totalCost = FLEET_MASTER_DATA.claims.reduce((s, c) => s + c.amount, 0) + FLEET_MASTER_DATA.maintenanceHistory.reduce((s, m) => s + m.cost, 0);
+        const activeTrucks = filteredData.filter(t => t.maintStatus !== 'Critical').length;
+        const criticalTrucks = filteredData.length - activeTrucks;
+        
+        populateKPIRibbon('exec-kpi-ribbon', [
+            { label: 'Total Fleet Assets', value: filteredData.length, status: 'Across all regions', statusColor: '#94a3b8' },
+            { label: 'Operational Availability', value: Math.round((activeTrucks/filteredData.length)*100) + '%', status: 'Target: 95%', statusColor: (activeTrucks/filteredData.length) > 0.9 ? '#10b981' : '#f59e0b' },
+            { label: 'Critical Assets Down', value: criticalTrucks, status: 'Immediate action needed', statusColor: criticalTrucks > 0 ? '#ef4444' : '#10b981' },
+            { label: 'Total Financial Impact', value: '₱' + (totalCost/1000).toFixed(1) + 'k', status: 'Claims + Maintenance', statusColor: '#ef4444' }
+        ]);
+
+        if(charts.execFleetStatus) charts.execFleetStatus.destroy();
+        charts.execFleetStatus = new Chart(document.getElementById('execFleetStatusChart').getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: ['Active / Healthy', 'Monitor / Warning', 'Critical / Down'],
+                datasets: [{
+                    data: [
+                        filteredData.filter(t => t.maintStatus === 'Healthy').length,
+                        filteredData.filter(t => t.maintStatus === 'Monitor' || t.maintStatus === 'Warning').length,
+                        criticalTrucks
+                    ],
+                    backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
+                    borderWidth: 0
+                }]
+            },
+            options: { maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'bottom' } } }
+        });
+
+        const vendorCosts = {};
+        FLEET_MASTER_DATA.maintenanceHistory.forEach(m => {
+            if(!vendorCosts[m.vendor]) vendorCosts[m.vendor] = 0;
+            vendorCosts[m.vendor] += m.cost;
+        });
+
+        if(charts.execFinancial) charts.execFinancial.destroy();
+        charts.execFinancial = new Chart(document.getElementById('execFinancialChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: Object.keys(vendorCosts),
+                datasets: [{
+                    label: 'Maintenance Spend (PHP)',
+                    data: Object.values(vendorCosts),
+                    backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                    borderRadius: 4
+                }]
+            },
+            options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
+        });
+
+        const tbody = document.querySelector('#exec-claims-table tbody');
+        tbody.innerHTML = '';
+        const combinedLog = [
+            ...FLEET_MASTER_DATA.claims.map(c => ({ id: c.id, truckId: c.truckId, date: c.date, type: `Claim (${c.severity})`, cost: c.amount, isClaim: true })),
+            ...FLEET_MASTER_DATA.maintenanceHistory.map(m => ({ id: '-', truckId: m.truckId, date: m.date, type: `Repair (${m.type})`, cost: m.cost, isClaim: false }))
+        ].sort((a,b) => b.cost - a.cost).slice(0, 5); // Top 5 highest costs
+
+        combinedLog.forEach(log => {
+            const rowClass = log.isClaim ? 'chip-red' : 'chip-amber';
+            tbody.innerHTML += `
+                <tr>
+                    <td><strong>${log.id}</strong></td>
+                    <td>${log.truckId}</td>
+                    <td>${log.date}</td>
+                    <td><span class="chip ${rowClass}">${log.type}</span></td>
+                    <td><strong>₱${log.cost.toLocaleString()}</strong></td>
+                </tr>
+            `;
         });
     }
 
@@ -772,7 +852,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- INITIALIZE ALL ---
     function renderActiveView(target) {
-        if(target === 'reefer') renderReeferView();
+        if(target === 'executive') renderExecutiveView();
+        else if(target === 'reefer') renderReeferView();
         else if(target === 'maintenance') renderMaintenanceView();
         else if(target === 'fuel') renderFuelView();
         else if(target === 'compliance') renderComplianceView();
@@ -801,5 +882,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initFilters();
     initAlerts();
-    renderActiveView('reefer');
+    renderActiveView('executive');
 });

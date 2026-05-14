@@ -17,7 +17,8 @@
         <!-- Embedded Top Navigation Bar (No Logo/Avatar) -->
         <header id="top-bar" style="padding: 0 16px;">
             <nav id="main-nav">
-                <a class="nav-item active" data-view="reefer">Reefer Runtime</a>
+                <a class="nav-item active" data-view="executive">Executive Summary</a>
+                <a class="nav-item" data-view="reefer">Reefer Runtime</a>
                 <a class="nav-item" data-view="maintenance">Preventive Maint.</a>
                 <a class="nav-item" data-view="fuel">Fuel Intelligence</a>
                 <a class="nav-item" data-view="compliance">Compliance</a>
@@ -74,9 +75,32 @@
 
             <main id="content">
                 <div class="dashboard-scroll-area">
-                    
+                    <!-- Executive Summary View -->
+                    <div id="view-executive" class="view-container active">
+                        <div class="kpi-ribbon" id="exec-kpi-ribbon"></div>
+                        <div class="widget-grid">
+                            <div class="widget" style="grid-column: span 4;">
+                                <div class="widget-header"><div class="widget-title">Overall Fleet Status</div></div>
+                                <div class="chart-container"><canvas id="execFleetStatusChart"></canvas></div>
+                            </div>
+                            <div class="widget" style="grid-column: span 8;">
+                                <div class="widget-header"><div class="widget-title">Financial & Maintenance Spend Summary</div></div>
+                                <div class="chart-container"><canvas id="execFinancialChart"></canvas></div>
+                            </div>
+                            <div class="widget" style="grid-column: span 12;">
+                                <div class="widget-header"><div class="widget-title">Recent High-Severity Claims & Repairs</div></div>
+                                <div class="table-container">
+                                    <table id="exec-claims-table">
+                                        <thead><tr><th>ID</th><th>Truck #</th><th>Date</th><th>Type / Status</th><th>Cost (PHP)</th></tr></thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Reefer View -->
-                    <div id="view-reefer" class="view-container active">
+                    <div id="view-reefer" class="view-container">
                         <div class="kpi-ribbon" id="reefer-kpi-ribbon"></div>
                         <div class="widget-grid">
                             <div class="widget" style="grid-column: span 6;">
