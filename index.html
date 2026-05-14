@@ -16,14 +16,8 @@
     <div id="app-container">
         <!-- Embedded Top Navigation Bar (No Logo/Avatar) -->
         <header id="top-bar" style="padding: 0 16px;">
-            <nav id="main-nav">
-                <a class="nav-item active" data-view="executive">Executive Summary</a>
-                <a class="nav-item" data-view="reefer">Reefer Runtime</a>
-                <a class="nav-item" data-view="maintenance">Preventive Maint.</a>
+                <a class="nav-item active" data-view="maintenance">Preventive Maint.</a>
                 <a class="nav-item" data-view="fuel">Fuel Intelligence</a>
-                <a class="nav-item" data-view="compliance">Compliance</a>
-                <a class="nav-item" data-view="iot">IoT Device Health</a>
-                <a class="nav-item" data-view="safety">Driver Safety</a>
             </nav>
             <div class="top-bar-actions" style="display: flex; align-items: center; gap: 16px;">
                 <button id="toggle-feed-btn" style="background: none; border: none; font-size: 18px; cursor: pointer; color: var(--text-secondary); position: relative;">
@@ -75,57 +69,7 @@
 
             <main id="content">
                 <div class="dashboard-scroll-area">
-                    <!-- Executive Summary View -->
-                    <div id="view-executive" class="view-container active">
-                        <div class="kpi-ribbon" id="exec-kpi-ribbon"></div>
-                        <div class="widget-grid">
-                            <div class="widget" style="grid-column: span 4;">
-                                <div class="widget-header"><div class="widget-title">Overall Fleet Status</div></div>
-                                <div class="chart-container"><canvas id="execFleetStatusChart"></canvas></div>
-                            </div>
-                            <div class="widget" style="grid-column: span 8;">
-                                <div class="widget-header"><div class="widget-title">Financial & Maintenance Spend Summary</div></div>
-                                <div class="chart-container"><canvas id="execFinancialChart"></canvas></div>
-                            </div>
-                            <div class="widget" style="grid-column: span 12;">
-                                <div class="widget-header"><div class="widget-title">Recent High-Severity Claims & Repairs</div></div>
-                                <div class="table-container">
-                                    <table id="exec-claims-table">
-                                        <thead><tr><th>ID</th><th>Truck #</th><th>Date</th><th>Type / Status</th><th>Cost (PHP)</th></tr></thead>
-                                        <tbody></tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Reefer View -->
-                    <div id="view-reefer" class="view-container">
-                        <div class="kpi-ribbon" id="reefer-kpi-ribbon"></div>
-                        <div class="widget-grid">
-                            <div class="widget" style="grid-column: span 6;">
-                                <div class="widget-header"><div class="widget-title">Fleet Runtime Risk Bands (Click to filter table)</div></div>
-                                <div class="risk-band-container" id="runtime-risk-bands"></div>
-                            </div>
-                            <div class="widget" style="grid-column: span 6;">
-                                <div class="widget-header"><div class="widget-title">Average Runtime by Region</div></div>
-                                <div class="chart-container" style="height: 220px; position: relative; width: 100%;"><canvas id="reeferRegionChart"></canvas></div>
-                            </div>
-                            <div class="widget" style="grid-column: span 12;">
-                                <div class="widget-header">
-                                    <div class="widget-title" id="table-title">Truck Investigation Ledger</div>
-                                    <button id="clear-table-filter" style="display:none; font-size:12px; padding:4px 8px; background:var(--bg-main); border:1px solid var(--border); border-radius:4px; cursor:pointer;">Clear Filter</button>
-                                </div>
-                                <div class="table-container">
-                                    <table id="reefer-table">
-                                        <thead><tr><th>Truck #</th><th>Region</th><th>Type</th><th>Runtime</th><th>Avg/Day</th><th>Next Maint.</th><th>Status</th></tr></thead>
-                                        <tbody></tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
+                    
                     <!-- Maintenance View -->
                     <div id="view-maintenance" class="view-container">
                         <div class="kpi-ribbon" id="maintenance-kpi-ribbon"></div>
@@ -168,83 +112,6 @@
                             <div class="widget" style="grid-column: span 12;">
                                 <div class="widget-header"><div class="widget-title">Fuel Theft & Anomaly Alerts</div></div>
                                 <div id="fuel-theft-alerts" class="alert-list" style="max-height: 200px;"></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Compliance View -->
-                    <div id="view-compliance" class="view-container">
-                        <div class="kpi-ribbon" id="compliance-kpi-ribbon"></div>
-                        <div class="widget-grid">
-                            <div class="widget" style="grid-column: span 6;">
-                                <div class="widget-header"><div class="widget-title">Document Expiry Overview</div></div>
-                                <div class="chart-container" style="height: 220px; position: relative; width: 100%;"><canvas id="complianceDoughnutChart"></canvas></div>
-                            </div>
-                            <div class="widget" style="grid-column: span 6;">
-                                <div class="widget-header">
-                                    <div class="widget-title" id="compliance-table-title">Compliance Expiry Details</div>
-                                    <button id="clear-compliance-filter" style="display:none; font-size:12px; padding:4px 8px; background:var(--bg-main); border:1px solid var(--border); border-radius:4px; cursor:pointer;">Clear Filter</button>
-                                </div>
-                                <div class="table-container">
-                                    <table id="compliance-table">
-                                        <thead><tr><th>Truck #</th><th>Insurance</th><th>Registration</th><th>Permit</th></tr></thead>
-                                        <tbody></tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- IoT View -->
-                    <div id="view-iot" class="view-container">
-                        <div class="kpi-ribbon" id="iot-kpi-ribbon"></div>
-                        <div class="widget-grid">
-                            <div class="widget" style="grid-column: span 6;">
-                                <div class="widget-header"><div class="widget-title">Sensor Active Status</div></div>
-                                <div class="chart-container" style="height: 220px; position: relative; width: 100%;"><canvas id="iotBarChart"></canvas></div>
-                            </div>
-                            <div class="widget" style="grid-column: span 6;">
-                                <div class="widget-header"><div class="widget-title">Connectivity Quality (Ping Latency)</div></div>
-                                <div class="chart-container" style="height: 220px; position: relative; width: 100%;"><canvas id="iotLineChart"></canvas></div>
-                            </div>
-                            <div class="widget" style="grid-column: span 12;">
-                                <div class="widget-header">
-                                    <div class="widget-title" id="iot-table-title">Device Inventory & Action</div>
-                                    <button id="clear-iot-filter" style="display:none; font-size:12px; padding:4px 8px; background:var(--bg-main); border:1px solid var(--border); border-radius:4px; cursor:pointer;">Clear Filter</button>
-                                </div>
-                                <div class="table-container">
-                                    <table id="iot-table">
-                                        <thead><tr><th>Truck #</th><th>GPS</th><th>Fuel</th><th>Temp</th><th>Camera</th><th>Action</th></tr></thead>
-                                        <tbody></tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Safety View -->
-                    <div id="view-safety" class="view-container">
-                        <div class="kpi-ribbon" id="safety-kpi-ribbon"></div>
-                        <div class="widget-grid">
-                            <div class="widget" style="grid-column: span 6;">
-                                <div class="widget-header"><div class="widget-title">Critical Events (Harsh Braking vs Speeding)</div></div>
-                                <div class="chart-container" style="height: 220px; position: relative; width: 100%;"><canvas id="safetyEventsChart"></canvas></div>
-                            </div>
-                            <div class="widget" style="grid-column: span 6;">
-                                <div class="widget-header"><div class="widget-title">Fatigue & Microsleep Risk</div></div>
-                                <div class="chart-container" style="height: 220px; position: relative; width: 100%;"><canvas id="fatigueRiskChart"></canvas></div>
-                            </div>
-                            <div class="widget" style="grid-column: span 12;">
-                                <div class="widget-header">
-                                    <div class="widget-title" id="safety-table-title">Driver Safety Scorecard</div>
-                                    <button id="clear-safety-filter" style="display:none; font-size:12px; padding:4px 8px; background:var(--bg-main); border:1px solid var(--border); border-radius:4px; cursor:pointer;">Clear Filter</button>
-                                </div>
-                                <div class="table-container">
-                                    <table id="safety-table">
-                                        <thead><tr><th>Driver</th><th>Region</th><th>Truck #</th><th>Harsh Events</th><th>Speeding</th><th>Microsleeps</th><th>Safety Score</th></tr></thead>
-                                        <tbody></tbody>
-                                    </table>
-                                </div>
                             </div>
                         </div>
                     </div>
