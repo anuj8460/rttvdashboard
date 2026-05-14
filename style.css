@@ -300,6 +300,12 @@ main#content {
     color: var(--text-primary);
 }
 
+.chart-container {
+    height: 220px;
+    position: relative;
+    width: 100%;
+}
+
 /* Risk Bands */
 .risk-band-container { display: flex; flex-direction: column; gap: 12px; }
 .risk-band { display: flex; align-items: center; gap: 12px; }
