@@ -453,10 +453,10 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         filteredData.forEach(t => {
-            if(t.iot.gps === 'Active') sensors.gps.active++; else sensors.gps.offline++;
-            if(t.iot.fuel === 'Active') sensors.fuel.active++; else sensors.fuel.offline++;
-            if(t.iot.temp === 'Active') sensors.temp.active++; else sensors.temp.offline++;
-            if(t.iot.camera === 'Active') sensors.camera.active++; else sensors.camera.offline++;
+            if(t.iot.gps === 'Active') sensors.gps.active++; else if(t.iot.gps === 'Offline') sensors.gps.offline++;
+            if(t.iot.fuel === 'Active') sensors.fuel.active++; else if(t.iot.fuel === 'Offline') sensors.fuel.offline++;
+            if(t.iot.temp === 'Active') sensors.temp.active++; else if(t.iot.temp === 'Offline') sensors.temp.offline++;
+            if(t.iot.camera === 'Active') sensors.camera.active++; else if(t.iot.camera === 'Offline') sensors.camera.offline++;
         });
 
         const totalOffline = sensors.gps.offline + sensors.fuel.offline + sensors.temp.offline + sensors.camera.offline;
@@ -657,6 +657,25 @@ document.addEventListener('DOMContentLoaded', () => {
         else if(target === 'fuel') renderFuelView();
         else if(target === 'compliance') renderComplianceView();
         else if(target === 'iot') renderIoTView();
+    }
+
+    // --- LIVE FEED TOGGLE ---
+    const feedPanel = document.getElementById('alert-feed-panel');
+    const toggleBtn = document.getElementById('toggle-feed-btn');
+    const alertBadge = document.getElementById('alert-badge');
+    
+    // Default to hidden
+    feedPanel.style.display = 'none';
+
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+            if (feedPanel.style.display === 'none') {
+                feedPanel.style.display = 'flex';
+                if (alertBadge) alertBadge.style.display = 'none';
+            } else {
+                feedPanel.style.display = 'none';
+            }
+        });
     }
 
     initFilters();

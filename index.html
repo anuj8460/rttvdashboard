@@ -20,7 +20,11 @@
                 <a class="nav-item" data-view="compliance">Compliance</a>
                 <a class="nav-item" data-view="iot">IoT Device Health</a>
             </nav>
-            <div class="top-bar-actions">
+            <div class="top-bar-actions" style="display: flex; align-items: center; gap: 16px;">
+                <button id="toggle-feed-btn" style="background: none; border: none; font-size: 18px; cursor: pointer; color: var(--text-secondary); position: relative;">
+                    <i class="fas fa-bell"></i>
+                    <span id="alert-badge" style="position: absolute; top: -6px; right: -6px; background: #ef4444; color: white; font-size: 10px; font-weight: bold; padding: 2px 5px; border-radius: 10px;">4</span>
+                </button>
                 <div class="live-indicator">
                     <span class="live-indicator-dot"></span>
                     LIVE
