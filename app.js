@@ -261,7 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
         heatmap.style.gridTemplateColumns = `120px repeat(${FLEET_MASTER_DATA.regions.length}, 1fr)`;
         heatmap.innerHTML = `<div></div>${FLEET_MASTER_DATA.regions.map(r => `<div style="font-size: 10px; font-weight: 700; text-align: center;">${r}</div>`).join('')}`;
         
-        ['Engine', 'Transmission', 'Reefer Unit', 'Tires'].forEach(asset => {
+        ['Engine', 'Transmission', 'Reefer Unit', 'GPS / Telematics'].forEach(asset => {
             heatmap.innerHTML += `<div style="font-size: 11px; font-weight: 600; padding: 4px 0;">${asset}</div>`;
             FLEET_MASTER_DATA.regions.forEach(r => {
                 const score = Math.floor(Math.random() * 3);
